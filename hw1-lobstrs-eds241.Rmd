@@ -1,12 +1,14 @@
 ---
 title: "Assignment 1: California Spiny Lobster Abundance (*Panulirus Interruptus*)"
 subtitle: "Assessing the Impact of Marine Protected Areas (MPAs) at 5 Reef Sites in Santa Barbara County"
-author: "EDS 241"
+author: "Emma Bea Mitchell"
 date: "1/8/2024 (Due 1/22)"
 output: 
     html_document:
       theme: flatly
     pdf_document: default
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -32,7 +34,7 @@ knitr::opts_chunk$set(eval=FALSE, warning = FALSE, message = FALSE )
 -  Your knitted presentation should meet the quality you'd submit to research colleagues or feel confident sharing publicly. Refer to the rubric for details about presentation standards.
 
 
-**Assignment submission (YOUR NAME):** ______________________________________
+**Assignment submission Emma Bea Mitchell:** ______________________________________
 
 
 ----------------------------------------------------------------------
@@ -49,7 +51,8 @@ library(gt)
 library(gtsummary)
 library(MASS) ## NOTE: The `select()` function is masked. Use: `dplyr::select()` ##
 library(interactions) 
-
+library(ggridges)
+library(ggbeeswarm)
 ```
 
 ------------------------------------------------------------------------
@@ -77,7 +80,9 @@ Let’s break it down step by step and see what the data reveals! 📊
 
 Step 1: Anticipating potential sources of selection bias
 
-**a.** Do the control sites (Arroyo Quemado, Carpenteria, and Mohawk) provide a strong counterfactual for our treatment sites (Naples, Isla Vista)? Write a paragraph making a case for why this comparison is centris paribus or whether selection bias is likely (be specific!).  
+**a.** Do the control sites (Arroyo Quemado, Carpenteria, and Mohawk) provide a strong counterfactual for our treatment sites (Naples, Isla Vista)? Write a paragraph making a case for why this comparison is centris paribus or whether selection bias is likely (be specific!). 
+
+Although we can see on the map above that the control sights (Arroyo Quemado, Carpenteria, and Mohawk) are relatively close along to the coast line to the treatment sites (Naples, Isla Vista), we can't assume that these sights are completely identical. Without further information about how these sights are nearly identical in relevant attributes, I wouldn't assume that there is no selection bias. Each area has a different human population, which may impact lobster populations. They may also have varying ecosystems and habitats such as sandy, rocky, more shallow areas, more predators, etc. Although selection bias is most likely present, it appears to be a similar enough comparison to make accurate assumptions about the effects of MPAs on lobster populations. 
 
 ------------------------------------------------------------------------
 
@@ -90,7 +95,9 @@ Step 2: Read & wrangle data
 ```{r}
 # HINT: check for coding of missing values (`na = "-99999"`)
 
-rawdata <- 
+rawdata <- read_csv(here("data", "spiny_abundance_sb_18.csv")) |> 
+    clean_names() |> 
+    naniar::replace_with_na(replace = list(size_mm = -99999))
 
 ```
 
@@ -99,9 +106,9 @@ rawdata <-
     "Arroyo Quemado", "Carpenteria", "Mohawk", "Isla Vista",  "Naples"
 
 ```{r}
+ tidydata <- rawdata |>    
+    mutate(reef = factor(site, order = TRUE, levels = c("AQUE", "CARP", "MOHK", "IVEE", "NAPL"), labels = c("Arroyo Quemado", "Carpenteria", "Mohawk", "Isla Vista",  "Naples"))) 
 
-tidydata <- 
-    
 ```
 
 Create new `df` named `spiny_counts` 
@@ -117,9 +124,17 @@ Create new `df` named `spiny_counts`
 ```{r}
 #HINT(d): Use `group_by()` & `summarize()` to provide the total number of lobsters observed at each site-year-transect row-observation. 
 
-#HINT(e): Use `case_when()` to create the 3 new variable columns
+spiny_counts <- tidydata |> 
+    group_by(site, year, transect) |> 
+    summarize(counts = sum(count, na.rm = TRUE),
+              mean_size = mean(size_mm, na.rm = TRUE)) |> 
+    mutate(mpa = case_when(
+        site %in% c("IVEE", "NAPL") ~ "MPA",
+        site %in% c("AQUE", "CARP", "MOHK") ~ "non_MPA"
+    ), treat = case_when(mpa == "MPA" ~ 1,
+                        mpa == "non_MPA" ~ 0))
 
-spiny_counts <- 
+#HINT(e): Use `case_when()` to create the 3 new variable columns
 
 ```
 
@@ -149,12 +164,66 @@ Create plots displaying the distribution of lobster **counts**:
 Create a plot of lobster **size** :
 
 4) You choose the grouping variable(s)!
-
+= 
 ```{r}
-# plot 1: ....
+# plot 1: density ridge plot
+plot1 <- spiny_counts |> 
+    ggplot(aes(x = counts, y = site)) +
+    geom_density_ridges2(quantile_lines = TRUE,
+                         alpha = 0.3,
+                         fill = "blue3",
+                         color = "navy") +
+    labs(
+        title = "Density Plot of Spiny Lobster Counts by Reef Site",
+        subtitle = "(including quartiles as descriptive statistic)",
+        x = "Spiny Lobster Counts",
+        y = "Density") +
+    theme_bw()
 
-spiny_counts %>% 
-ggplot()
+plot1
+
+
+# plot 2: beeswarm (with boxplot)
+
+plot2 <- ggplot(spiny_counts, aes(x = mpa, y = counts)) +
+    geom_boxplot(outlier.shape = NA) +
+    ggbeeswarm::geom_beeswarm(size = 1, alpha = .4, color = "orange4") +
+    scale_y_continuous(limits = quantile(spiny_counts$counts, c(0.1, 0.9))) +
+    theme_bw() +
+    labs(
+        title = "Boxplot with Beeswarm Overlay of Spiny Lobster Counts by MPA Status",
+        x = "MPA Status",
+        y = "Lobster Counts") 
+plot2   
+
+# plot 3: violin plot
+
+plot3 <- ggplot(spiny_counts, aes(x = as.factor(year), y = counts)) +
+    geom_violin(color = "green4", fill = "green3") +
+    stat_summary(fun.y=median, geom="crossbar", size=.3, color="black") +
+    scale_y_continuous(limits = quantile(spiny_counts$counts, c(0.1, 0.9))) +
+    theme_bw() +
+    labs(
+        title = "Violin Plot of Spiny Lobster Counts by Year",
+        subtitle = "(including medians as the descriptive statistic)",
+        x = "Year",
+        y = "Spiny Lobster Counts")
+
+plot3
+
+# plot 4: jitter plot
+
+plot4 <- ggplot(spiny_counts, aes(x = year, y = mean_size)) +
+    geom_jitter(color = "darkred", size = 1.2) +
+    theme_bw() +
+    labs(
+        title = "Jitter Plot of Spiny Lobster Average Size by Year",
+        x = "Year",
+        y = "Average Lobster Size") +
+     scale_x_continuous(limits=c(2012, 2018), expand = c(0,NA))
+    
+
+plot4
     
 ```
 
@@ -162,6 +231,13 @@ ggplot()
 
 ```{r}
 # USE: gt_summary::tbl_summary()
+
+spiny_counts |> 
+    dplyr::select(counts, mean_size, mpa) |>
+    tbl_summary(by = mpa,
+                statistic = list(all_continuous() ~ "{mean}")) |>
+    modify_caption("**Comparing the mean counts and mean sizes of California Spiny Lobsters at MPA and non-MPA sites**")
+
 ```
 
 ------------------------------------------------------------------------
@@ -175,11 +251,14 @@ Step 4: OLS regression- building intuition
 ```{r}
 # NOTE: We will not evaluate/interpret model fit in this assignment (e.g., R-square)
 
-m1_ols <- 
+m1_ols <- lm(counts ~ treat, data = spiny_counts)
 
 summ(m1_ols, model.fit = FALSE) 
 
 ```
+
+The intercept is the lobster count when the site is not an MPA. The treat plus the intercept is the count when the site is an MPA. The p-value of the intercept is 0, which is means it is significant. The treat coefficient has a p value of .3, meaning that the coefficient is not statisticall significant. 
+
 
 **c.** Check the model assumptions using the `check_model` function from the `performance` package
 
@@ -190,14 +269,17 @@ check_model(m1_ols,  check = "qq" )
 ```
 
 
+
 ```{r}
 check_model(m1_ols, check = "normality")
 ```
 
 
+
 ```{r}
 check_model(m1_ols, check = "homogeneity")
 ```
+
 
 
 ```{r}
