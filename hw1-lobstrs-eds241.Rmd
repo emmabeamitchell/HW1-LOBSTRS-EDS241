@@ -53,6 +53,7 @@ library(MASS) ## NOTE: The `select()` function is masked. Use: `dplyr::select()`
 library(interactions) 
 library(ggridges)
 library(ggbeeswarm)
+library(gtsummary)
 ```
 
 ------------------------------------------------------------------------
@@ -257,7 +258,7 @@ summ(m1_ols, model.fit = FALSE)
 
 ```
 
-The intercept is the lobster count when the site is not an MPA. The treat plus the intercept is the count when the site is an MPA. The p-value of the intercept is 0, which is means it is significant. The treat coefficient has a p value of .3, meaning that the coefficient is not statisticall significant. 
+The intercept coefficient is the lobster count when the site is not an MPA (22.73). The treatment plus the intercept is the count when the site is an MPA (28.09). The p-value of the intercept is 0, which is means it is significant. The treat coefficient has a p value of .3, meaning that the coefficient is not statistically significant. 
 
 
 **c.** Check the model assumptions using the `check_model` function from the `performance` package
@@ -268,23 +269,26 @@ The intercept is the lobster count when the site is not an MPA. The treat plus t
 check_model(m1_ols,  check = "qq" )
 ```
 
-
+This model check is looking at the normality of residuals. If our residuals were normal, the dots would fall along the green line. Our results mean that are residuals are very much not normal. Because we are using a linear regression model, it's important that our residuals are normal. Our results show that our OLS model is not a good fit. 
 
 ```{r}
 check_model(m1_ols, check = "normality")
 ```
 
-
+This model is also looking at the normality of residuals, this time looking at the shape of the curve. If our distributions fell close to the green curve on the graph, we would have a normally distributed curve as expected if our model was linear. Because it's far from being close to the curve, it's clear our distribution is not normal and we should not be using a linear regression model. 
 
 ```{r}
 check_model(m1_ols, check = "homogeneity")
 ```
 
+This model is looking at the homogeneity of variance, meaning that we're looking at the equality of the variance across our samples. The subtitle tells us that the reference line should be flat and horizontal, but when we look at the graph we can tell that the line is extremely curved in a U shape. This is a sign that our data could be skewed or biased. This is another sign that a linear regression is not the right choice. 
 
 
 ```{r}
 check_model(m1_ols, check = "pp_check")
 ```
+
+This model is looking at the posterior predictive check, meaning that it's looking at how well the model shows means, standard deviations, and quantiles. If the model predicted data lines lined up with the green observed data line, our model would successfully capture relevant aspects. We are seeing that our lines are not lining up because our model is not showing these aspects successfully. This is another sign that our linear regression model is not the right choice.
 
 ------------------------------------------------------------------------
 
@@ -303,11 +307,24 @@ Step 5: Fitting GLMs
 
 #HINT2: For the second glm() argument `family` use the following specification option `family = poisson(link = "log")`
 
-m2_pois <- 
+m2_pois <- glm(counts ~ treat,
+               spiny_counts,
+               family = poisson(link = "log"))
 
+summ(m2_pois)
+
+exp(.21) - 1
 ```
 
+b. The predictor coefficient is .21 on a log scale. When using a poisson regression model we take the exponent of that predictor coefficient and then subtract one. This gives us the percent changed when the treatment is present (it is an mpa site). The results are a 23.36 percent increase. 
+
+c. The poisson model makes the assumption that the mean is equal to the dispersion (variance). When there is overdispersion that means that the dispersion (variance) is greater than the mean. 
+
+d. In the previous model, the treatment effect was not statistically significant. Its p-value was .3, which is over the .05 threshold for significance. In this model, the p-value of the treatment is 0.00, meaning that it is significant in this model. In the previous model, the treatment effect was 5.36, translating to about a 23.58 percent increase from non-mpa sites. In this model the predictor coefficient tells us that the treament effect is 23.36 percent. Both results are extremely close, although there is a slight increase in signficance of effect in the poisson model. 
+
 **e.** Check the model assumptions. Explain results.
+
+The model assumes that the mean is equal to the distribution. By using the overdispersion test we can tell that the dispersion does not equal the mean, meaning that poisson is not a good fit. We also checked the zero inflation, which showed that there were too many zeros in our model, another sign that poisson is not a good fit. 
 
 **f.** Conduct tests for over-dispersion & zero-inflation. Explain results.
 
@@ -315,13 +332,18 @@ m2_pois <-
 check_model(m2_pois)
 ```
 
+
 ```{r}
 check_overdispersion(m2_pois)
 ```
 
+This test shows that overdispersion was detected in the model. The p-value is less than .001, meaning that the test results are statistically significant. We now know that the dispersion is greater than the mean. 
+
 ```{r}
 check_zeroinflation(m2_pois)
 ```
+
+This test shows us that the model is underfitting zeros and that zero-inflation is probable. That means that the model is allowing too many zeros. This is a sign to us that a glm model was not the right choice. 
 
 **g.** Fit a negative binomial model using the function glm.nb() from the package `MASS` and check model diagnostics 
 
