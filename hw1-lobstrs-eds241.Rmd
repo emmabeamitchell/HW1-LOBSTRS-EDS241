@@ -12,7 +12,7 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(eval=FALSE, warning = FALSE, message = FALSE )
+knitr::opts_chunk$set(eval=TRUE, warning = FALSE, message = FALSE )
 ```
 
 ------------------------------------------------------------------------
@@ -167,6 +167,8 @@ Create a plot of lobster **size** :
 4) You choose the grouping variable(s)!
 = 
 ```{r}
+#| echo: true
+
 # plot 1: density ridge plot
 plot1 <- spiny_counts |> 
     ggplot(aes(x = counts, y = site)) +
@@ -181,7 +183,7 @@ plot1 <- spiny_counts |>
         y = "Density") +
     theme_bw()
 
-plot1
+print(plot1)
 
 
 # plot 2: beeswarm (with boxplot)
@@ -195,7 +197,7 @@ plot2 <- ggplot(spiny_counts, aes(x = mpa, y = counts)) +
         title = "Boxplot with Beeswarm Overlay of Spiny Lobster Counts by MPA Status",
         x = "MPA Status",
         y = "Lobster Counts") 
-plot2   
+print(plot2)   
 
 # plot 3: violin plot
 
@@ -210,7 +212,7 @@ plot3 <- ggplot(spiny_counts, aes(x = as.factor(year), y = counts)) +
         x = "Year",
         y = "Spiny Lobster Counts")
 
-plot3
+print(plot3)
 
 # plot 4: jitter plot
 
@@ -224,7 +226,7 @@ plot4 <- ggplot(spiny_counts, aes(x = year, y = mean_size)) +
      scale_x_continuous(limits=c(2012, 2018), expand = c(0,NA))
     
 
-plot4
+print(plot4)
     
 ```
 
@@ -266,26 +268,26 @@ The intercept coefficient is the lobster count when the site is not an MPA (22.7
 **d.** Explain the results of the 4 diagnostic plots. Why are we getting this result?
 
 ```{r}
-check_model(m1_ols,  check = "qq" )
+print(check_model(m1_ols,  check = "qq" ))
 ```
 
 This model check is looking at the normality of residuals. If our residuals were normal, the dots would fall along the green line. Our results mean that are residuals are very much not normal. Because we are using a linear regression model, it's important that our residuals are normal. Our results show that our OLS model is not a good fit. 
 
 ```{r}
-check_model(m1_ols, check = "normality")
+print(check_model(m1_ols, check = "normality"))
 ```
 
 This model is also looking at the normality of residuals, this time looking at the shape of the curve. If our distributions fell close to the green curve on the graph, we would have a normally distributed curve as expected if our model was linear. Because it's far from being close to the curve, it's clear our distribution is not normal and we should not be using a linear regression model. 
 
 ```{r}
-check_model(m1_ols, check = "homogeneity")
+print(check_model(m1_ols, check = "homogeneity"))
 ```
 
 This model is looking at the homogeneity of variance, meaning that we're looking at the equality of the variance across our samples. The subtitle tells us that the reference line should be flat and horizontal, but when we look at the graph we can tell that the line is extremely curved in a U shape. This is a sign that our data could be skewed or biased. This is another sign that a linear regression is not the right choice. 
 
 
 ```{r}
-check_model(m1_ols, check = "pp_check")
+print(check_model(m1_ols, check = "pp_check"))
 ```
 
 This model is looking at the posterior predictive check, meaning that it's looking at how well the model shows means, standard deviations, and quantiles. If the model predicted data lines lined up with the green observed data line, our model would successfully capture relevant aspects. We are seeing that our lines are not lining up because our model is not showing these aspects successfully. This is another sign that our linear regression model is not the right choice.
@@ -313,7 +315,7 @@ m2_pois <- glm(counts ~ treat,
 
 summ(m2_pois)
 
-exp(.21) - 1
+print(exp(.21) - 1)
 ```
 
 b. The predictor coefficient is .21 on a log scale. When using a poisson regression model we take the exponent of that predictor coefficient and then subtract one. This gives us the percent changed when the treatment is present (it is an mpa site). The results are a 23.36 percent increase. 
@@ -329,18 +331,18 @@ The model assumes that the mean is equal to the distribution. By using the overd
 **f.** Conduct tests for over-dispersion & zero-inflation. Explain results.
 
 ```{r}
-check_model(m2_pois)
+print(check_model(m2_pois))
 ```
 
 
 ```{r}
-check_overdispersion(m2_pois)
+print(check_overdispersion(m2_pois))
 ```
 
 This test shows that overdispersion was detected in the model. The p-value is less than .001, meaning that the test results are statistically significant. We now know that the dispersion is greater than the mean. 
 
 ```{r}
-check_zeroinflation(m2_pois)
+print(check_zeroinflation(m2_pois))
 ```
 
 This test shows us that the model is underfitting zeros and that zero-inflation is probable. That means that the model is allowing too many zeros. This is a sign to us that a glm model was not the right choice. 
@@ -352,30 +354,41 @@ This test shows us that the model is underfitting zeros and that zero-inflation 
 **i.** Interpret the treatment estimate result in your own words. Compare with results from the previous model.
 
 ```{r}
-
 # NOTE: The `glm.nb()` function does not require a `family` argument
 
-m3_nb <- 
+m3_nb <- MASS::glm.nb(counts ~ treat,
+               spiny_counts)
 
-```
+summ(m3_nb)
 
-
-```{r}
-check_overdispersion(m3_nb)
-```
-
-```{r}
-check_zeroinflation(m3_nb)
+print(exp(.21) - 1)
 ```
 
 ```{r}
-check_predictions(m3_nb)
+print(check_overdispersion(m3_nb))
 ```
+
+As expected, this model controls for overdispersion, so there is none present.
 
 ```{r}
-check_model(m3_nb)
+print(check_zeroinflation(m3_nb))
 ```
 
+This model does not control/ have a parameter for zero inflation, so it makes sense that overfitting of zeros would still be present.
+
+```{r}
+print(check_predictions(m3_nb))
+```
+
+This model's observed data and model-predicted data seem to line up in the graph. Meaning that the model represents mean, quantiles, and standard deviation well. 
+
+```{r}
+print(check_model(m3_nb))
+```
+
+h. The rationale for fitting a negative binomial model is that it accounts for over dispersion by adding a parameter. We know from the poisson model checks that there is over dispersion in our model, so we know that over dispersion is something we need to account for. 
+
+i. The treatment estimate is .21, and similar to the poisson model this one also shows log-scale coefficients. When performing the equation we can tell that the treatment effect is 23.36 percent. The p-value of the treatment coefficient is .22, meaning it's not statistically significant. The treatment effect is very similar to the first model (23.58), and the same as the poisson model (23.36) 
 
 ------------------------------------------------------------------------
 
@@ -387,11 +400,12 @@ Step 6: Compare models
 
 ```{r}
 
-export_summs(# ADD MODELS
-             model.names = c("OLS","Poisson", "NB"),
-             statistics = "none")
+export_summs(m1_ols, m2_pois, m3_nb,
+             model.names = c("OLS","Poisson", "NB"))
 
 ```
+
+The results of all three models are actually quite similar. The OLS regression looks different in numbers, but that is only because the poisson and negative binomial are log scale coefficients. In actuality, the treatment effect from all the models are extremely similar. The poisson and negative binomial models have the same summary outputs. This signifies to me that the treatment effect is robust/stable across models. 
 
 ------------------------------------------------------------------------
 
@@ -407,8 +421,11 @@ Step 7: Building intuition - fixed effects
 
 **c.** Take a look at the regression output. Each coefficient provides a comparison or the difference in means for a specific sub-group in the data. Informally, describe the what the model has estimated at a conceptual level (NOTE: you do not have to interpret coefficients individually)
 
+The model has estimated the treatment effect, but has also included the years. There is a coefficient for each year for both treatment and non treatment sites. The intercept coefficient represents the non-treatment sites in 2012 (that's the year that is left out of the coefficients), and the treat coefficient represents the treatment sites in 2012. 
+
 **d.** Explain why the main effect for treatment is negative? *Does this result make sense?
 
+This result does make sense because the main treatment effect does not actually represent the main effect without any years, it actually represents the treatment effect in 2012. The negative treatment coefficient makes sense because it just means a decrease in counts in the treatment group in 2012. 
 
 ```{r}
 
@@ -426,13 +443,15 @@ summ(m5_fixedeffs, model.fit = FALSE)
 
 **f.** Re-evaluate your responses (c) and (b) above. 
 
+When re-evaluating my responses based on the plot, I can see that the year 2012 is significantly lower than in change than the rest of the years. This lines up with the negative treat coefficient. In 2012 and 2013, the treatment group was actually lower than the non-treatment group. After that the treatment group is higher than the non-treatment group the majority of the time. 
+
 ```{r}
 
 # Hint 1: Group counts by `year` and `mpa` and calculate the `mean_count`
 # Hint 2: Convert variable `year` to a factor
 
-interact_plot(m5_fixedeffs, pred = year, modx = treat,
-              outcome.scale = "response")
+print(interact_plot(m5_fixedeffs, pred = year, modx = treat,
+              outcome.scale = "response"))
 
 ```
 
@@ -448,9 +467,24 @@ The plot should have...
 # Hint 1: Group counts by `year` and `mpa` and calculate the `mean_count`
 # Hint 2: Convert variable `year` to a factor
 
-plot_counts <- 
+plot_counts <- spiny_counts |> 
+    group_by(year, mpa) |> 
+    summarize(mean_counts = mean(counts)) |> 
+    mutate(year = as.factor(year)) |> 
+    ggplot(aes(x = year, y = mean_counts, color = mpa)) +
+    geom_point() +
+    geom_line(aes(group = mpa)) +
+    labs(
+        title = "Treatment Effect (MPA) Changes in Lobster Counts from 2012 to 2018",
+        x = "Year",
+        y = "Mean Lobster Counts"
+    ) +
+    scale_color_manual(values = c("navy", "lightblue3" ),
+                       labels = c("MPA", "Non-MPA")) +
+    scale_linetype_manual(values = c("solid", "longdash"))
 
-# plot_counts %>% ggplot() ...
+print(plot_counts)
+
 ```
 
 ------------------------------------------------------------------------
@@ -458,12 +492,25 @@ plot_counts <-
 Step 8: Reconsider causal identification assumptions
 
 a. Discuss whether you think `spillover effects` are likely in this research context (see Glossary of terms; https://docs.google.com/document/d/1RIudsVcYhWGpqC-Uftk9UTz3PIq6stVyEpT44EPNgpE/edit?usp=sharing)
+
+I think that there is likely at least some spillover in this research context. The sites are all fairly close together (both MPA and non-MPA), meaning that an increase in lobsters at an MPA site may have an effect on the non-MPA sites, it could be as simple as lobsters moving from one site to another. 
+
 b. Explain why spillover is an issue for the identification of causal effects
+
+Spillover is an issue for identifying causal effects because it would mean that the treatment and control groups are not independent. The treatment is also somehow affecting the control. 
+
 c. How does spillover relate to impact in this research setting?
+
+Spillover relates to impact because we can't trust that our counts at our sites are independent of each other. The rise in counts in non-MPA sites could be due to the MPA sites being nearby. We can't be sure of the true impact of MPA sites. 
+
 d. Discuss the following causal inference assumptions in the context of the MPA treatment effect estimator. Evaluate if each of the assumption are reasonable: 
     
     1) SUTVA: Stable Unit Treatment Value assumption 
     2) Excludability assumption
+
+SUTVA is not a reasonable assumption because we can assume there is a spillover effect. The Stable Unit Treatment Value assumes that the control and treatment groups are unaffected by each other. Because there is spillover, it violates the key assumption in the SUTVA that there is no interference of effect on MPAs on non-MPAs. 
+
+The Excludability assumption is that the treatment influences the lobster counts at MPA sites and that the treatment (the MPA regulations) are the only things influencing the treatment sites. This is not a reasonable assumption in our research because if there is a spillover effect we can't be sure that the treatment is actually influencing lobster count differences between sites. 
 
 ------------------------------------------------------------------------
 
