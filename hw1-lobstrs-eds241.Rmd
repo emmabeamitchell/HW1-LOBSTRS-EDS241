@@ -2,11 +2,11 @@
 title: "Assignment 1: California Spiny Lobster Abundance (*Panulirus Interruptus*)"
 subtitle: "Assessing the Impact of Marine Protected Areas (MPAs) at 5 Reef Sites in Santa Barbara County"
 author: "Emma Bea Mitchell"
-date: "1/8/2024 (Due 1/22)"
+date: "1/8/2024 (Due 1/26)"
 output: 
+    pdf_document: default
     html_document:
       theme: flatly
-    pdf_document: default
 editor_options: 
   chunk_output_type: console
 ---
@@ -40,7 +40,7 @@ knitr::opts_chunk$set(eval=TRUE, warning = FALSE, message = FALSE )
 ----------------------------------------------------------------------
 
 ```{r}
-
+# Load libraries
 library(tidyverse)
 library(here)
 library(janitor)
@@ -66,13 +66,13 @@ Reed D. 2019. SBC LTER: Reef: Abundance, size and fishing effort for California 
 
 ### **Introduction**
 
-You're about to dive into some deep data collected from five reef sites in Santa Barbara County, all about the abundance of California spiny lobsters! 🦞 Data was gathered by divers annually from 2012 to 2018 across Naples, Mohawk, Isla Vista, Carpinteria, and Arroyo Quemado reefs.
+You're about to dive into some deep data collected from five reef sites in Santa Barbara County, all about the abundance of California spiny lobsters! Data was gathered by divers annually from 2012 to 2018 across Naples, Mohawk, Isla Vista, Carpinteria, and Arroyo Quemado reefs.
 
 Why lobsters? Well, this sample provides an opportunity to evaluate the impact of Marine Protected Areas (MPAs) established on January 1, 2012 (Reed, 2019). Of these five reefs, Naples, and Isla Vista are MPAs, while the other three are not protected (non-MPAs). Comparing lobster health between these protected and non-protected areas gives us the chance to study how commercial and recreational fishing might impact these ecosystems.
 
 We will consider the MPA sites the `treatment` group and use regression methods to explore whether protecting these reefs really makes a difference compared to non-MPA sites (our control group). In this assignment, we’ll think deeply about which causal inference assumptions hold up under the research design and identify where they fall short. 
 
-Let’s break it down step by step and see what the data reveals! 📊
+Let’s break it down step by step and see what the data reveals!
 
 ![](figures/map-5reefs.png)
 
@@ -95,7 +95,7 @@ Step 2: Read & wrangle data
 
 ```{r}
 # HINT: check for coding of missing values (`na = "-99999"`)
-
+# Load data and clean
 rawdata <- read_csv(here("data", "spiny_abundance_sb_18.csv")) |> 
     clean_names() |> 
     naniar::replace_with_na(replace = list(size_mm = -99999))
@@ -107,6 +107,7 @@ rawdata <- read_csv(here("data", "spiny_abundance_sb_18.csv")) |>
     "Arroyo Quemado", "Carpenteria", "Mohawk", "Isla Vista",  "Naples"
 
 ```{r}
+# Create new column
  tidydata <- rawdata |>    
     mutate(reef = factor(site, order = TRUE, levels = c("AQUE", "CARP", "MOHK", "IVEE", "NAPL"), labels = c("Arroyo Quemado", "Carpenteria", "Mohawk", "Isla Vista",  "Naples"))) 
 
@@ -124,6 +125,7 @@ Create new `df` named `spiny_counts`
 
 ```{r}
 #HINT(d): Use `group_by()` & `summarize()` to provide the total number of lobsters observed at each site-year-transect row-observation. 
+# Create new variables
 
 spiny_counts <- tidydata |> 
     group_by(site, year, transect) |> 
@@ -167,8 +169,6 @@ Create a plot of lobster **size** :
 4) You choose the grouping variable(s)!
 = 
 ```{r}
-#| echo: true
-
 # plot 1: density ridge plot
 plot1 <- spiny_counts |> 
     ggplot(aes(x = counts, y = site)) +
@@ -207,7 +207,7 @@ plot3 <- ggplot(spiny_counts, aes(x = as.factor(year), y = counts)) +
     scale_y_continuous(limits = quantile(spiny_counts$counts, c(0.1, 0.9))) +
     theme_bw() +
     labs(
-        title = "Violin Plot of Spiny Lobster Counts by Year",
+        title = "Violin Plot of Spiny Lobster Counts by Year (2012-2018)",
         subtitle = "(including medians as the descriptive statistic)",
         x = "Year",
         y = "Spiny Lobster Counts")
@@ -220,7 +220,7 @@ plot4 <- ggplot(spiny_counts, aes(x = year, y = mean_size)) +
     geom_jitter(color = "darkred", size = 1.2) +
     theme_bw() +
     labs(
-        title = "Jitter Plot of Spiny Lobster Average Size by Year",
+        title = "Jitter Plot of Spiny Lobster Average Size by Year (2012 - 2018)",
         x = "Year",
         y = "Average Lobster Size") +
      scale_x_continuous(limits=c(2012, 2018), expand = c(0,NA))
@@ -253,7 +253,7 @@ Step 4: OLS regression- building intuition
 
 ```{r}
 # NOTE: We will not evaluate/interpret model fit in this assignment (e.g., R-square)
-
+# Fit OLS model
 m1_ols <- lm(counts ~ treat, data = spiny_counts)
 
 summ(m1_ols, model.fit = FALSE) 
@@ -309,6 +309,7 @@ Step 5: Fitting GLMs
 
 #HINT2: For the second glm() argument `family` use the following specification option `family = poisson(link = "log")`
 
+# Fit poisson model
 m2_pois <- glm(counts ~ treat,
                spiny_counts,
                family = poisson(link = "log"))
@@ -355,7 +356,7 @@ This test shows us that the model is underfitting zeros and that zero-inflation 
 
 ```{r}
 # NOTE: The `glm.nb()` function does not require a `family` argument
-
+# Fit NB model
 m3_nb <- MASS::glm.nb(counts ~ treat,
                spiny_counts)
 
@@ -399,7 +400,7 @@ Step 6: Compare models
 **c.** Write a short paragraph comparing the results. Is the treatment effect `robust` or stable across the model specifications. 
 
 ```{r}
-
+# Create comparison table
 export_summs(m1_ols, m2_pois, m3_nb,
              model.names = c("OLS","Poisson", "NB"))
 
@@ -428,7 +429,6 @@ The model has estimated the treatment effect, but has also included the years. T
 This result does make sense because the main treatment effect does not actually represent the main effect without any years, it actually represents the treatment effect in 2012. The negative treatment coefficient makes sense because it just means a decrease in counts in the treatment group in 2012. 
 
 ```{r}
-
 ff_counts <- spiny_counts %>% 
     mutate(year=as_factor(year))
     
@@ -446,10 +446,9 @@ summ(m5_fixedeffs, model.fit = FALSE)
 When re-evaluating my responses based on the plot, I can see that the year 2012 is significantly lower than in change than the rest of the years. This lines up with the negative treat coefficient. In 2012 and 2013, the treatment group was actually lower than the non-treatment group. After that the treatment group is higher than the non-treatment group the majority of the time. 
 
 ```{r}
-
 # Hint 1: Group counts by `year` and `mpa` and calculate the `mean_count`
 # Hint 2: Convert variable `year` to a factor
-
+# Plot interact plot
 print(interact_plot(m5_fixedeffs, pred = year, modx = treat,
               outcome.scale = "response"))
 
@@ -466,7 +465,7 @@ The plot should have...
 ```{r}
 # Hint 1: Group counts by `year` and `mpa` and calculate the `mean_count`
 # Hint 2: Convert variable `year` to a factor
-
+# Plot remake of interaction plot using ggplot
 plot_counts <- spiny_counts |> 
     group_by(year, mpa) |> 
     summarize(mean_counts = mean(counts)) |> 
@@ -519,9 +518,227 @@ The Excludability assumption is that the treatment influences the lobster counts
 > Use the recent lobster abundance data with observations collected up until 2024 (`lobster_sbchannel_24.csv`) to run an analysis evaluating the effect of MPA status on lobster counts using the same focal variables.
 
 a. Create a new script for the analysis on the updated data
+
+```{r}
+recent_lobster <- read_csv(here("data", "lobster_sbchannel_24.csv")) |> 
+    clean_names() |> 
+    naniar::replace_with_na(replace = list(size_mm = -99999))
+```
+
+```{r}
+recent_lobster_clean <- recent_lobster |>    
+    mutate(reef = factor(site, order = TRUE, levels = c("AQUE", "CARP", "MOHK", "IVEE", "NAPL"), labels = c("Arroyo Quemado", "Carpenteria", "Mohawk", "Isla Vista",  "Naples"))) 
+
+```
+
+```{r}
+recent_counts <- recent_lobster_clean |> 
+    group_by(site, year, transect) |> 
+    summarize(counts = sum(count, na.rm = TRUE),
+              mean_size = mean(size_mm, na.rm = TRUE)) |> 
+    mutate(mpa = case_when(
+        site %in% c("IVEE", "NAPL") ~ "MPA",
+        site %in% c("AQUE", "CARP", "MOHK") ~ "non_MPA"
+    ), treat = case_when(mpa == "MPA" ~ 1,
+                        mpa == "non_MPA" ~ 0))
+
+```
+
+
+```{r}
+# plot 1: density ridge plot
+plot1 <- recent_counts |> 
+    ggplot(aes(x = counts, y = site)) +
+    geom_density_ridges2(quantile_lines = TRUE,
+                         alpha = 0.3,
+                         fill = "blue3",
+                         color = "navy") +
+    labs(
+        title = "Density Plot of Spiny Lobster Counts by Reef Site",
+        subtitle = "(including quartiles as descriptive statistic)",
+        x = "Spiny Lobster Counts",
+        y = "Density") +
+    theme_bw()
+
+print(plot1)
+
+
+# plot 2: beeswarm (with boxplot)
+
+plot2 <- ggplot(recent_counts, aes(x = mpa, y = counts)) +
+    geom_boxplot(outlier.shape = NA) +
+    ggbeeswarm::geom_beeswarm(size = 1, alpha = .4, color = "orange4") +
+    scale_y_continuous(limits = quantile(spiny_counts$counts, c(0.1, 0.9))) +
+    theme_bw() +
+    labs(
+        title = "Boxplot with Beeswarm Overlay of Spiny Lobster Counts by MPA Status",
+        x = "MPA Status",
+        y = "Lobster Counts") 
+print(plot2)   
+
+# plot 3: violin plot
+
+plot3 <- ggplot(recent_counts, aes(x = as.factor(year), y = counts)) +
+    geom_violin(color = "green4", fill = "green3") +
+    stat_summary(fun.y=median, geom="crossbar", size=.3, color="black") +
+    scale_y_continuous(limits = quantile(spiny_counts$counts, c(0.1, 0.9))) +
+    theme_bw() +
+    labs(
+        title = "Violin Plot of Spiny Lobster Counts by Year (2012-2024)",
+        subtitle = "(including medians as the descriptive statistic)",
+        x = "Year",
+        y = "Spiny Lobster Counts")
+
+print(plot3)
+
+# plot 4: jitter plot
+
+plot4 <- ggplot(recent_counts, aes(x = year, y = mean_size)) +
+    geom_jitter(color = "darkred", size = 1.2) +
+    theme_bw() +
+    labs(
+        title = "Jitter Plot of Spiny Lobster Average Size by Year (2012-2024)",
+        x = "Year",
+        y = "Average Lobster Size") +
+     scale_x_continuous(limits=c(2012, 2018), expand = c(0,NA))
+    
+
+print(plot4)
+```
+
+```{r}
+recent_counts |> 
+    dplyr::select(counts, mean_size, mpa) |>
+    tbl_summary(by = mpa,
+                statistic = list(all_continuous() ~ "{mean}")) |>
+    modify_caption("**Comparing the mean counts and mean sizes of California Spiny Lobsters at MPA and non-MPA sites**")
+```
+
+
 b. Run at least 3 regression models & assess model diagnostics
+
+```{r}
+m1_ols_recent <- lm(counts ~ treat, data = recent_counts)
+
+summ(m1_ols_recent, model.fit = FALSE) 
+```
+
+```{r}
+print(check_model(m1_ols_recent,  check = "qq" ))
+```
+
+```{r}
+print(check_model(m1_ols_recent, check = "normality"))
+```
+
+```{r}
+print(check_model(m1_ols_recent, check = "homogeneity"))
+```
+
+```{r}
+print(check_model(m1_ols_recent, check = "pp_check"))
+```
+
+```{r}
+m2_pois_recent <- glm(counts ~ treat,
+               recent_counts,
+               family = poisson(link = "log"))
+
+summ(m2_pois_recent)
+
+print(exp(.25) - 1)
+```
+
+```{r}
+print(check_model(m2_pois_recent))
+```
+
+```{r}
+print(check_overdispersion(m2_pois_recent))
+```
+
+```{r}
+print(check_zeroinflation(m2_pois_recent))
+```
+
+```{r}
+m3_nb_recent <- MASS::glm.nb(counts ~ treat,
+               recent_counts)
+
+summ(m3_nb_recent)
+
+print(exp(.25) - 1)
+```
+
+```{r}
+print(check_overdispersion(m3_nb_recent))
+```
+
+```{r}
+print(check_zeroinflation(m3_nb_recent))
+```
+
+```{r}
+print(check_predictions(m3_nb_recent))
+```
+
+```{r}
+print(check_model(m3_nb_recent))
+```
+
+```{r}
+export_summs(m1_ols_recent, m2_pois_recent, m3_nb_recent,
+             model.names = c("OLS","Poisson", "NB"))
+```
+
+```{r}
+ff_counts_recent <- recent_counts %>% 
+    mutate(year=as_factor(year))
+    
+m5_fixedeffs_recent <- lm(
+    log(counts+1) ~ treat*year,
+    data = ff_counts_recent)
+
+summ(m5_fixedeffs_recent, model.fit = FALSE)
+```
+
+
+```{r}
+print(interact_plot(m5_fixedeffs_recent, pred = year, modx = treat,
+              outcome.scale = "response"))
+```
+
+```{r}
+plot_counts_recent <- recent_counts |> 
+    group_by(year, mpa) |> 
+    summarize(mean_counts = mean(counts)) |> 
+    mutate(year = as.factor(year)) |> 
+    ggplot(aes(x = year, y = mean_counts, color = mpa)) +
+    geom_point() +
+    geom_line(aes(group = mpa)) +
+    labs(
+        title = "Treatment Effect (MPA) Changes in Lobster Counts from 2012 to 2024",
+        x = "Year",
+        y = "Mean Lobster Counts"
+    ) +
+    scale_color_manual(values = c("navy", "lightblue3" ),
+                       labels = c("MPA", "Non-MPA")) +
+    scale_linetype_manual(values = c("solid", "longdash"))
+
+print(plot_counts_recent)
+```
+
+
 c. Compare and contrast results with the analysis from the 2012-2018 data sample (~ 2 paragraphs)
 
+```{r}
+export_summs(m1_ols, m2_pois, m3_nb, m1_ols_recent, m2_pois_recent, m3_nb_recent,
+             model.names = c("OLS","Poisson", "NB", "2024 OLS", "2024 Poisson", "2024 NB"))
+```
+
+The results of the original OLS analysis versus this new one differs by 2.36. This result isn't surprising because we see a significant spike in 2018 - 2020 for MPA sites over non-MPA sites. This spike isn't seen in the original OLS analysis because it ends at 2018. The results of the original Poisson analysis versus this one differs by 5.03%. Once again, it makes sense that the recent poisson model has a bigger treatment effect because of the spike that is unaccounted for in the first model. Like the previous model, this recent Negative Binomial model has the same treatment effect as the Poisson model. 
+
+When looking at the plots, we can see that after the spike from 2018-2020, the MPA site actually dips lower in counts than the non-MPA sites. There is also a significant spike in both MPA and non-MPA sites in 2023. My theory is that the spillover effect that we are seeing in the original data is continuing even more here. As the spillover builds up, it makes the non-MPA sites follow the trends of the MPA sites.  
 
 ------------------------------------------------------------------------
 
